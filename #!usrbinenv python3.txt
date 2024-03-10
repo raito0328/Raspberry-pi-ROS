@@ -1,0 +1,62 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+import rospy
+import time
+from geometry_msgs.msg import Twist
+from std_msgs.msg import Float32MultiArray
+
+GpsPointLat = 34.863827 #目標地点の緯度
+GpsPointLng = 135.197418 #目標地点の経度
+
+def stop_motor(pub):
+    rospy.loginfo("Stopping motor...")
+    twist = Twist()
+    twist.linear.x = 0
+    twist.angular.z = 0
+    pub.publish(twist) # モーターの停止命令を送信
+
+def motor_controller():
+    rospy.init_node('motor_controller')
+    pub = rospy.Publisher('cmd_vel', Twist, queue_size=10) # Twist型のメッセージをパブリッシュするためのパブリッシャーを設定
+    rospy.on_shutdown(lambda: stop_motor(pub))
+    rate = rospy.Rate(50) # 50Hz
+
+    def callback(data):
+        distanceLat = abs(GpsPointLat - data.data[0])
+        distanceLng = abs(GpsPointLng - data.data[1])
+
+        if distanceLat > 0.00001 and distanceLng > 0.00001:
+            aLat = distanceLat
+            aLng = distanceLng
+            twist = Twist()
+            twist.linear.x = 1
+            twist.angular.z = 0
+            rospy.loginfo("aLat: %f", aLat)
+            rospy.loginfo("aLng: %f", aLng)
+            pub.publish(twist)
+            time.sleep(10)
+            bLat = distanceLat
+            bLng = distanceLng
+            rospy.loginfo("bLat: %f", bLat)
+            rospy.loginfo("bLng: %f", bLng)
+            rospy.loginfo("")
+
+            if aLat < bLat and aLng < bLng:
+                twist = Twist()
+                twist.linear.x = 0
+                twist.angular.z = 1
+                pub.publish(twist)
+                rospy.loginfo("a")
+                time.sleep(0.5)
+        else:
+            pass
+
+    rospy.Subscriber('gnss', Float32MultiArray, callback)
+    rospy.spin()
+
+if __name__ == '__main__':
+    try:
+        motor_controller()
+    except rospy.ROSInterruptException:
+        pass
