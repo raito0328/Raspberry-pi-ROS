@@ -26,7 +26,7 @@ def motor_controller():
         distanceLat = abs(GpsPointLat - data.data[0])
         distanceLng = abs(GpsPointLng - data.data[1])
 
-        if distanceLat > 0.00001 and distanceLng > 0.00001:
+        if distanceLat > 0.00011 or distanceLng > 0.00011:
             aLat = distanceLat
             aLng = distanceLng
             twist = Twist()
@@ -47,10 +47,9 @@ def motor_controller():
                 twist.linear.x = 0
                 twist.angular.z = 1
                 pub.publish(twist)
-                rospy.loginfo("a")
                 time.sleep(0.5)
         else:
-            pass
+            rospy.on_shutdown(lambda: stop_motor(pub))
 
     rospy.Subscriber('gnss', Float32MultiArray, callback)
     rospy.spin()
