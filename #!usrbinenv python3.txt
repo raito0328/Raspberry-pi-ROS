@@ -9,6 +9,12 @@ from std_msgs.msg import Float32MultiArray
 GpsPointLat = 34.863827 #目標地点の緯度
 GpsPointLng = 135.197418 #目標地点の経度
 
+prevLat = 999
+prevLng = 999
+
+distanceLat = 0
+distanceLng = 0
+
 def stop_motor(pub):
     rospy.loginfo("Stopping motor...")
     twist = Twist()
@@ -16,42 +22,58 @@ def stop_motor(pub):
     twist.angular.z = 0
     pub.publish(twist) # モーターの停止命令を送信
 
-def motor_controller():
-    rospy.init_node('motor_controller')
-    pub = rospy.Publisher('cmd_vel', Twist, queue_size=10) # Twist型のメッセージをパブリッシュするためのパブリッシャーを設定
-    rospy.on_shutdown(lambda: stop_motor(pub))
-    rate = rospy.Rate(50) # 50Hz
+def callback(data):
+    global distanceLat, distanceLng, prevLat, prevLng
+    distanceLat = abs(GpsPointLat - data.data[0])
+    distanceLng = abs(GpsPointLng - data.data[1])
 
-    def callback(data):
-        distanceLat = abs(GpsPointLat - data.data[0])
-        distanceLng = abs(GpsPointLng - data.data[1])
+    if prevLat == 999 and prevLng == 999:
+        prevLat = data.data[0]
+        prevLng = data.data[1]
 
-        if distanceLat > 0.00011 or distanceLng > 0.00011:
-            aLat = distanceLat
-            aLng = distanceLng
+        if distanceLat > 0.00001 or distanceLng > 0.00001:
+            prevDistanceLat = distanceLat
+            prevDistanceLng = distanceLng
             twist = Twist()
             twist.linear.x = 1
             twist.angular.z = 0
-            rospy.loginfo("aLat: %f", aLat)
-            rospy.loginfo("aLng: %f", aLng)
+            rospy.loginfo("prevDistanceLat: %f", prevDistanceLat)
+            rospy.loginfo("prevDistanceLng: %f", prevDistanceLng)
             pub.publish(twist)
             time.sleep(10)
-            bLat = distanceLat
-            bLng = distanceLng
-            rospy.loginfo("bLat: %f", bLat)
-            rospy.loginfo("bLng: %f", bLng)
-            rospy.loginfo("")
-
-            if aLat < bLat and aLng < bLng:
-                twist = Twist()
-                twist.linear.x = 0
-                twist.angular.z = 1
-                pub.publish(twist)
-                time.sleep(0.5)
         else:
-            rospy.on_shutdown(lambda: stop_motor(pub))
+            rospy.loginfo("Goal")
+            stop_motor(pub)
+
+    else:
+
+        currentDistanceLat = abs(GpsPointLat - data.data[0])
+        currentDistanceLng = abs(GpsPointLng - data.data[1])
+        rospy.loginfo("currentDistanceLat: %f", currentDistanceLat)
+        rospy.loginfo("currentDistanceLng: %f", currentDistanceLng)
+        rospy.loginfo("")
+        prevDistanceLat = abs(GpsPointLat - prevLat)
+        prevDistanceLng = abs(GpsPointLat - prevLng)
+
+        prevLat = 999
+        prevLng = 999
+
+        if prevDistanceLat >= currentDistanceLat or prevDistanceLng >= currentDistanceLng:
+            twist = Twist()
+            twist.linear.x = 0
+            twist.angular.z = 1
+            pub.publish(twist)
+            time.sleep(0.5)
+
+def motor_controller():
+    rospy.init_node('motor_controller')
+    global pub
+    pub = rospy.Publisher('cmd_vel', Twist, queue_size=10) # Twist型のメッセージをパブリッシュするためのパブリッシャーを設定
+    rospy.on_shutdown(lambda: stop_motor(pub))
+    rate = rospy.Rate(50) # 50msc
 
     rospy.Subscriber('gnss', Float32MultiArray, callback)
+
     rospy.spin()
 
 if __name__ == '__main__':
