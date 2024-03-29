@@ -44,6 +44,7 @@ def callback(data):
         else:
             rospy.loginfo("Goal")
             stop_motor(pub)
+            rospy.signal_shutdown("Reached the destination")
 
     else:
 
